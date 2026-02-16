@@ -3,63 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lilly Youn의 중국어 단어장 생성기</title>
+    <title>Lilly Youn의 중국어 학습 도우미</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
-        <h1>📖 Lilly Youn의 중국어 단어장 생성기</h1>
-        <p class="subtitle">사진을 업로드하면 AI가 중국어, 병음, 뜻을 추출하여 Word 단어장을 만들어줍니다</p>
+        <h1>Lilly Youn의 중국어 학습 도우미</h1>
 
-        <!-- Upload Section -->
-        <div id="upload-section" class="section">
-            <div class="upload-area" id="drop-zone">
-                <div class="upload-icon">📷</div>
-                <p>이미지를 드래그하거나 클릭하여 업로드</p>
-                <p class="hint">JPG, PNG, WebP 지원 · 여러 장 가능</p>
-                <input type="file" id="file-input" multiple accept="image/*" hidden>
-            </div>
-            <div id="file-list" class="file-list"></div>
-            <button id="extract-btn" class="btn btn-primary" disabled>AI 추출 시작</button>
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="vocab">단어장</button>
+            <button class="tab-btn" data-tab="workbook">워크북</button>
         </div>
 
-        <!-- Loading Section -->
-        <div id="loading-section" class="section" style="display:none;">
-            <div class="spinner"></div>
-            <p>AI가 이미지를 분석 중입니다...</p>
+        <!-- ===== 단어장 탭 ===== -->
+        <div id="tab-vocab" class="tab-content active">
+            <p class="subtitle">사진을 업로드하면 AI가 중국어, 병음, 뜻을 추출하여 Word 단어장을 만들어줍니다</p>
+
+            <!-- Upload Section -->
+            <div id="vocab-upload-section" class="section">
+                <div class="upload-area" id="vocab-drop-zone">
+                    <div class="upload-icon">📷</div>
+                    <p>이미지를 드래그하거나 클릭하여 업로드</p>
+                    <p class="hint">JPG, PNG, WebP 지원 · 여러 장 가능</p>
+                    <input type="file" id="vocab-file-input" multiple accept="image/*" hidden>
+                </div>
+                <div id="vocab-file-list" class="file-list"></div>
+                <button id="vocab-extract-btn" class="btn btn-primary" disabled>AI 추출 시작</button>
+            </div>
+
+            <!-- Loading Section -->
+            <div id="vocab-loading-section" class="section" style="display:none;">
+                <div class="spinner"></div>
+                <p>AI가 이미지를 분석 중입니다...</p>
+            </div>
+
+            <!-- Result Section -->
+            <div id="vocab-result-section" class="section" style="display:none;">
+                <h2>추출 결과 <span id="vocab-word-count"></span></h2>
+                <div class="table-wrapper">
+                    <table id="vocab-result-table" class="result-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>한자</th>
+                                <th>병음</th>
+                                <th>뜻</th>
+                                <th>삭제</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vocab-result-body"></tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button id="vocab-add-row-btn" class="btn btn-secondary">+ 행 추가</button>
+                    <button id="vocab-generate-btn" class="btn btn-primary">Word 파일 생성</button>
+                </div>
+            </div>
+
+            <!-- Download Section -->
+            <div id="vocab-download-section" class="section" style="display:none;">
+                <div class="success-icon">✅</div>
+                <p>단어장이 생성되었습니다!</p>
+                <a id="vocab-download-link" class="btn btn-primary" href="#">📥 다운로드</a>
+                <button id="vocab-reset-btn" class="btn btn-secondary">새로 만들기</button>
+            </div>
         </div>
 
-        <!-- Result Section -->
-        <div id="result-section" class="section" style="display:none;">
-            <h2>추출 결과 <span id="word-count"></span></h2>
-            <div class="table-wrapper">
-                <table id="result-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>한자</th>
-                            <th>병음</th>
-                            <th>뜻</th>
-                            <th>삭제</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result-body"></tbody>
-                </table>
-            </div>
-            <div class="actions">
-                <button id="add-row-btn" class="btn btn-secondary">+ 행 추가</button>
-                <button id="generate-btn" class="btn btn-primary">Word 파일 생성</button>
-            </div>
-        </div>
+        <!-- ===== 워크북 탭 ===== -->
+        <div id="tab-workbook" class="tab-content">
+            <p class="subtitle">교재 사진을 업로드하면 AI가 유형을 자동 감지하여 따라쓰기 워크북을 만들어줍니다</p>
 
-        <!-- Download Section -->
-        <div id="download-section" class="section" style="display:none;">
-            <div class="success-icon">✅</div>
-            <p>단어장이 생성되었습니다!</p>
-            <a id="download-link" class="btn btn-primary" href="#">📥 다운로드</a>
-            <button id="reset-btn" class="btn btn-secondary">새로 만들기</button>
+            <!-- Upload Section -->
+            <div id="wb-upload-section" class="section">
+                <div class="upload-area" id="wb-drop-zone">
+                    <div class="upload-icon">📷</div>
+                    <p>교재 이미지를 드래그하거나 클릭하여 업로드</p>
+                    <p class="hint">JPG, PNG, WebP 지원 · 여러 장 가능</p>
+                    <input type="file" id="wb-file-input" multiple accept="image/*" hidden>
+                </div>
+                <div id="wb-file-list" class="file-list"></div>
+                <button id="wb-extract-btn" class="btn btn-primary" disabled>AI 추출 시작</button>
+            </div>
+
+            <!-- Loading Section -->
+            <div id="wb-loading-section" class="section" style="display:none;">
+                <div class="spinner"></div>
+                <p>AI가 교재를 분석 중입니다...</p>
+            </div>
+
+            <!-- Result Section - Type 1 -->
+            <div id="wb-result-section-type1" class="section" style="display:none;">
+                <h2>추출 결과 (세로 테이블) <span id="wb-entry-count-type1"></span></h2>
+                <div class="table-wrapper">
+                    <table id="wb-result-table-type1" class="result-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>한자</th>
+                                <th>병음</th>
+                                <th>의미</th>
+                                <th>예문</th>
+                                <th>삭제</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wb-result-body-type1"></tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button id="wb-add-row-btn-type1" class="btn btn-secondary">+ 행 추가</button>
+                    <button id="wb-generate-btn-type1" class="btn btn-primary">워크북 생성</button>
+                </div>
+            </div>
+
+            <!-- Result Section - Type 2 -->
+            <div id="wb-result-section-type2" class="section" style="display:none;">
+                <h2>추출 결과 (유형학습) <span id="wb-entry-count-type2"></span></h2>
+                <div class="table-wrapper">
+                    <table id="wb-result-table-type2" class="result-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>화자</th>
+                                <th>본문해석 (한국어)</th>
+                                <th>본문 (중국어)</th>
+                                <th>삭제</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wb-result-body-type2"></tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button id="wb-add-row-btn-type2" class="btn btn-secondary">+ 행 추가</button>
+                    <button id="wb-generate-btn-type2" class="btn btn-primary">워크북 생성</button>
+                </div>
+            </div>
+
+            <!-- Download Section -->
+            <div id="wb-download-section" class="section" style="display:none;">
+                <div class="success-icon">✅</div>
+                <p>워크북이 생성되었습니다!</p>
+                <a id="wb-download-link" class="btn btn-primary" href="#">📥 다운로드</a>
+                <button id="wb-reset-btn" class="btn btn-secondary">새로 만들기</button>
+            </div>
         </div>
     </div>
     <script src="/static/js/main.js"></script>
+    <script src="/static/js/workbook.js"></script>
 </body>
 </html>

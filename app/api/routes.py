@@ -3,12 +3,13 @@ import os
 import traceback
 import uuid
 
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.models.schemas import ExtractResponse, GenerateRequest, WordEntry
-from app.services.ai_extractor import extract_words
+from app.models.schemas import ExtractResponse, GenerateRequest, WordEntry, WorkbookGenerateRequest
+from app.services.ai_extractor import extract_words, extract_workbook, detect_workbook_type
 from app.services.word_generator import generate_word
+from app.services.workbook_generator import generate_workbook
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -16,6 +17,8 @@ router = APIRouter(prefix="/api")
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "temp")
 
+
+# ===== 단어장 API =====
 
 @router.post("/upload")
 async def upload_images(files: list[UploadFile] = File(...)):
@@ -106,5 +109,105 @@ async def download_file(download_id: str):
     return FileResponse(
         path=file_path,
         filename="중국어단어장.docx",
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
+# ===== 워크북 API =====
+
+@router.post("/workbook/upload")
+async def workbook_upload_images(
+    files: list[UploadFile] = File(...),
+):
+    """Upload images, auto-detect type, and extract workbook content."""
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="파일을 선택해주세요.")
+
+        job_id = str(uuid.uuid4())
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+        all_entries_type1 = []
+        all_entries_type2 = []
+
+        for file in files:
+            if not file.content_type or not file.content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"이미지 파일만 업로드 가능합니다: {file.filename}",
+                )
+
+            ext = os.path.splitext(file.filename or "img.jpg")[1]
+            temp_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}{ext}")
+            content = await file.read()
+            with open(temp_path, "wb") as f:
+                f.write(content)
+
+            logger.info(f"[Workbook] Saved: {temp_path} ({len(content)} bytes)")
+
+            try:
+                # Auto-detect type
+                detected_type = await detect_workbook_type(temp_path)
+                logger.info(f"[Workbook] {file.filename} detected as: {detected_type}")
+
+                # Extract based on detected type
+                entries = await extract_workbook(temp_path, detected_type)
+                logger.info(f"[Workbook] Extracted {len(entries)} entries")
+
+                if detected_type == "type1":
+                    all_entries_type1.extend(entries)
+                else:
+                    all_entries_type2.extend(entries)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+        return {
+            "job_id": job_id,
+            "type1_entries": all_entries_type1,
+            "type2_entries": all_entries_type2,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Workbook upload error: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"서버 오류: {type(e).__name__}: {str(e)}"},
+        )
+
+
+@router.post("/workbook/generate")
+async def workbook_generate_docx(request: WorkbookGenerateRequest):
+    """Generate a workbook Word file."""
+    try:
+        if not request.entries:
+            raise HTTPException(status_code=400, detail="데이터가 비어있습니다.")
+
+        output_path = generate_workbook(request.entries, request.workbook_type, request.job_id)
+        file_id = os.path.splitext(os.path.basename(output_path))[0]
+
+        return {"download_id": file_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Workbook generate error: {traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"서버 오류: {type(e).__name__}: {str(e)}"},
+        )
+
+
+@router.get("/workbook/download/{download_id}")
+async def workbook_download_file(download_id: str):
+    """Download the generated workbook Word file."""
+    file_path = os.path.join(UPLOAD_DIR, f"{download_id}.docx")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+
+    return FileResponse(
+        path=file_path,
+        filename="중국어워크북.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )

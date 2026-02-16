@@ -8,7 +8,7 @@ body {
 }
 
 .container {
-    max-width: 800px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 40px 20px;
 }
@@ -16,15 +16,56 @@ body {
 h1 {
     text-align: center;
     font-size: 2rem;
-    margin-bottom: 8px;
+    margin-bottom: 16px;
 }
 
 .subtitle {
     text-align: center;
     color: #666;
-    margin-bottom: 32px;
+    margin-bottom: 24px;
 }
 
+/* ===== Tab Navigation ===== */
+.tab-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 14px 24px;
+    border: none;
+    background: transparent;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+    color: #4a90d9;
+    background: #f8faff;
+}
+
+.tab-btn.active {
+    color: #4a90d9;
+    border-bottom-color: #4a90d9;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ===== Section ===== */
 .section {
     background: #fff;
     border-radius: 12px;
@@ -33,7 +74,7 @@ h1 {
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-/* Upload Area */
+/* ===== Upload Area ===== */
 .upload-area {
     border: 2px dashed #ccc;
     border-radius: 12px;
@@ -51,7 +92,7 @@ h1 {
 .upload-icon { font-size: 3rem; margin-bottom: 12px; }
 .hint { color: #999; font-size: 0.85rem; margin-top: 4px; }
 
-/* File List */
+/* ===== File List ===== */
 .file-list {
     margin-top: 16px;
     display: flex;
@@ -78,7 +119,7 @@ h1 {
 
 .file-tag .remove:hover { color: #e74c3c; }
 
-/* Buttons */
+/* ===== Buttons ===== */
 .btn {
     display: inline-block;
     padding: 12px 28px;
@@ -112,7 +153,7 @@ h1 {
     align-items: center;
 }
 
-/* Loading */
+/* ===== Loading ===== */
 .spinner {
     width: 48px;
     height: 48px;
@@ -125,49 +166,51 @@ h1 {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-#loading-section { text-align: center; }
+#vocab-loading-section, #wb-loading-section { text-align: center; }
 
-/* Result Table */
+/* ===== Result Table ===== */
 .table-wrapper { overflow-x: auto; }
 
-#result-table {
+.result-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 12px;
 }
 
-#result-table th, #result-table td {
+.result-table th, .result-table td {
     border: 1px solid #e0e0e0;
     padding: 10px 12px;
     text-align: left;
 }
 
-#result-table th {
+.result-table th {
     background: #f8f9fa;
     font-weight: 600;
     font-size: 0.9rem;
 }
 
-#result-table td input {
+.result-table td input, .result-table td textarea {
     width: 100%;
     border: none;
     outline: none;
     font-size: 0.95rem;
     padding: 2px;
     background: transparent;
+    font-family: inherit;
+    resize: vertical;
 }
 
-#result-table td input:focus {
+.result-table td input:focus, .result-table td textarea:focus {
     background: #f8faff;
 }
 
-#result-table td:first-child {
+.result-table td:first-child {
     width: 40px;
     text-align: center;
     color: #999;
 }
 
-#result-table td:last-child {
+.result-table td:last-child {
     width: 50px;
     text-align: center;
 }
@@ -182,15 +225,16 @@ h1 {
 
 .delete-btn:hover { color: #c0392b; }
 
-/* Download */
-#download-section { text-align: center; }
+/* ===== Download ===== */
+#vocab-download-section, #wb-download-section { text-align: center; }
 .success-icon { font-size: 3rem; margin-bottom: 12px; }
 
-#download-section .btn { margin: 8px; }
+#vocab-download-section .btn, #wb-download-section .btn { margin: 8px; }
 
-/* Word count */
-#word-count {
+/* ===== Word count ===== */
+#vocab-word-count, #wb-entry-count-type1, #wb-entry-count-type2 {
     font-size: 0.9rem;
     color: #999;
     font-weight: normal;
 }
+
