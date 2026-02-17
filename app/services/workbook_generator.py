@@ -7,7 +7,7 @@ from docx.oxml.ns import qn
 
 TEMP_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "temp")
 
-GRAY_COLOR = RGBColor(0xB0, 0xB0, 0xB0)
+GRAY_COLOR = RGBColor(0xEA, 0xEA, 0xEA)
 
 
 def _set_run_font(run, font_name: str, size: int, east_asia_font: str | None = None, color: RGBColor | None = None):

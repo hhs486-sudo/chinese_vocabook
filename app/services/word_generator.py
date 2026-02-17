@@ -101,6 +101,13 @@ def _set_cell_text(cell, text: str, font_name: str, font_size: int, east_asia_fo
 def generate_word(words: list[dict], job_id: str | None = None) -> str:
     """Generate a Word file from extracted words using the template."""
     doc = Document(os.path.abspath(TEMPLATE_PATH))
+
+    # Remove any document protection inherited from template
+    settings = doc.settings.element
+    doc_prot = settings.find(qn("w:documentProtection"))
+    if doc_prot is not None:
+        settings.remove(doc_prot)
+
     body = doc.element.body
     table = doc.tables[0]
 
