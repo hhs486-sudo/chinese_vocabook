@@ -123,19 +123,16 @@ AI가 이미지를 분석하여 아래 두 유형 중 하나로 자동 분류한
 | Type 1 (세로 테이블) | 표 형식. 한자 → 병음 → 의미 → 예문이 행으로 나열 | 다음자, 전치사, 어휘 정리표 |
 | Type 2 (유형학습) | 대화문 + 본문해석 구조. A:, B: 등 화자별 발화 | 유형학습 페이지 |
 
-### 4.3 유형 자동 감지 (`WORKBOOK_DETECT_PROMPT`)
+### 4.3 유형 자동 감지 + 추출 (통합 API 호출)
 
-```
-이미지는 중국어 교재 페이지입니다. 이미지의 유형을 판별하세요.
+이미지 1장당 **1회의 AI API 호출**로 유형 판별과 내용 추출을 동시에 처리한다 (`WORKBOOK_COMBINED_PROMPT`).
+여러 이미지를 업로드하면 `asyncio.gather`로 **병렬 처리**하여 속도를 극대화한다.
 
-유형 1 (type1): 표(테이블) 형식으로 한자, 병음, 의미, 예문이 행으로 나열된 페이지
-유형 2 (type2): 대화문이 있는 유형학습 페이지 (A:, B: 등 화자별 대화 본문 + 본문해석이 분리되어 있는 구조)
-
-→ 응답: {"type": "type1"} 또는 {"type": "type2"}
-```
-
-- AI 호출 1회로 유형 판별 → 판별된 유형에 맞는 추출 프롬프트로 2차 호출
+- 통합 프롬프트가 유형 판별 + 데이터 추출을 한 번에 수행
+- 응답: `{"type": "type1", "entries": [...]}` 또는 `{"type": "type2", "entries": [...]}`
 - 판별 실패 시 기본값 `type1`
+
+> **이전 방식** (레거시, 코드 유지): 유형 감지 1회 + 추출 1회 = 이미지당 2회 호출, 순차 처리
 
 ### 4.4 Type 1 — 세로 테이블 워크북
 
@@ -247,7 +244,8 @@ AI가 이미지를 분석하여 아래 두 유형 중 하나로 자동 분류한
     ]
   }
   ```
-- 처리 흐름: 이미지마다 `detect_workbook_type()` → `extract_workbook()` → 유형별 리스트에 추가
+- 처리 흐름: 이미지마다 `detect_and_extract_workbook()` (통합 1회 호출) → 유형별 리스트에 추가
+- 여러 이미지 업로드 시 `asyncio.gather`로 병렬 처리
 
 **POST `/api/workbook/generate`**
 - Request:
@@ -273,6 +271,7 @@ AI가 이미지를 분석하여 아래 두 유형 중 하나로 자동 분류한
 - Type 1 결과 테이블: #, 한자, 병음, 의미, 예문, 삭제
 - Type 2 결과 테이블: #, 화자(width:40px), 본문해석(한국어), 본문(중국어), 삭제
 - 워크북 생성 시 해당 유형의 entries만 서버로 전송
+- **다운로드 후 돌아가기**: 두 유형이 동시에 추출된 경우, 한쪽을 다운로드한 뒤 "추출 결과로 돌아가기" 버튼으로 나머지 유형도 생성/다운로드 가능 (추출 데이터 보존)
 
 ---
 
@@ -425,24 +424,30 @@ class WorkbookGenerateRequest(BaseModel):
 
 ### 9.2 워크북 AI 호출 흐름
 
+**현재 (통합 방식):** 이미지당 1회 호출 + 병렬 처리
 ```
-이미지 업로드
+이미지 N장 업로드
     ↓
-detect_workbook_type(file_path)     ← WORKBOOK_DETECT_PROMPT (max_tokens=256)
-    ↓ "type1" 또는 "type2"
-extract_workbook(file_path, type)   ← WORKBOOK_TYPE1_PROMPT 또는 TYPE2_PROMPT (max_tokens=4096)
+asyncio.gather(
+    detect_and_extract_workbook(img1),   ← WORKBOOK_COMBINED_PROMPT (max_tokens=4096)
+    detect_and_extract_workbook(img2),
+    ...
+)
     ↓
-entries 리스트 반환
+각 결과에서 type 확인 → type1_entries / type2_entries에 분류
 ```
+
+> **레거시 (코드 유지, 미사용):** `detect_workbook_type()` → `extract_workbook()` 순차 2회 호출
 
 ### 9.3 프롬프트 목록
 
 | 프롬프트 | 용도 | 응답 형식 |
 |----------|------|-----------|
 | `EXTRACT_PROMPT` | 단어장: 단어 추출 | `{"words": [...]}` |
-| `WORKBOOK_DETECT_PROMPT` | 워크북: 유형 판별 | `{"type": "type1"}` |
-| `WORKBOOK_TYPE1_PROMPT` | 워크북 Type1: 테이블 데이터 추출 | `{"entries": [...]}` |
-| `WORKBOOK_TYPE2_PROMPT` | 워크북 Type2: 대화 데이터 추출 | `{"entries": [...]}` |
+| `WORKBOOK_COMBINED_PROMPT` | 워크북: 유형 판별 + 데이터 추출 (통합) | `{"type": "type1\|type2", "entries": [...]}` |
+| `WORKBOOK_DETECT_PROMPT` | (레거시) 워크북: 유형 판별 | `{"type": "type1"}` |
+| `WORKBOOK_TYPE1_PROMPT` | (레거시) 워크북 Type1: 테이블 데이터 추출 | `{"entries": [...]}` |
+| `WORKBOOK_TYPE2_PROMPT` | (레거시) 워크북 Type2: 대화 데이터 추출 | `{"entries": [...]}` |
 
 ---
 
@@ -539,6 +544,8 @@ run.bat
 | 워크북 예문 누락 | AI가 일부 예문을 추출하지 않음 | 프롬프트 강화: "예문이 이미지에 있는데 누락하지 마세요" |
 | Type 2 대화 간 빈 줄 | Word 문단 기본 spacing | `space_before=Pt(0)`, `space_after=Pt(0)` 설정 |
 | 워크북 유형 감지 오류 | `detect_workbook_type` 함수 중복 정의 | 중복 함수 제거, 올바른 `_detect_type_*` 함수 사용 |
+| 워크북 추출 속도 느림 | 이미지당 AI 2회 호출 + 순차 처리 | 통합 프롬프트 (1회 호출) + `asyncio.gather` 병렬 처리 |
+| 두 유형 동시 추출 시 다운로드 후 복귀 불가 | 다운로드 화면에서 결과로 돌아가는 수단 없음 | "추출 결과로 돌아가기" 버튼 추가 (데이터 보존) |
 
 ---
 

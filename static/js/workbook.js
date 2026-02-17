@@ -10,10 +10,13 @@
     const resultSectionType2 = document.getElementById('wb-result-section-type2');
     const downloadSection = document.getElementById('wb-download-section');
     const downloadLink = document.getElementById('wb-download-link');
+    const backBtn = document.getElementById('wb-back-btn');
     const resetBtn = document.getElementById('wb-reset-btn');
 
     let selectedFiles = [];
     let currentJobId = null;
+    let hasType1Data = false;
+    let hasType2Data = false;
 
     // --- Upload ---
     dropZone.addEventListener('click', () => fileInput.click());
@@ -83,18 +86,18 @@
             loadingSection.style.display = 'none';
 
             // Show results based on what was detected
-            const hasType1 = data.type1_entries && data.type1_entries.length > 0;
-            const hasType2 = data.type2_entries && data.type2_entries.length > 0;
+            hasType1Data = data.type1_entries && data.type1_entries.length > 0;
+            hasType2Data = data.type2_entries && data.type2_entries.length > 0;
 
-            if (hasType1) {
+            if (hasType1Data) {
                 renderType1Result(data.type1_entries);
                 resultSectionType1.style.display = 'block';
             }
-            if (hasType2) {
+            if (hasType2Data) {
                 renderType2Result(data.type2_entries);
                 resultSectionType2.style.display = 'block';
             }
-            if (!hasType1 && !hasType2) {
+            if (!hasType1Data && !hasType2Data) {
                 alert('이미지에서 워크북 데이터를 추출하지 못했습니다.');
                 uploadSection.style.display = 'block';
             }
@@ -253,6 +256,10 @@
             downloadLink.href = `/api/workbook/download/${data.download_id}`;
             loadingSection.style.display = 'none';
             downloadSection.style.display = 'block';
+
+            // Show back button if there are other result sections with data
+            const otherHasData = (wbType === 'type1' && hasType2Data) || (wbType === 'type2' && hasType1Data);
+            backBtn.style.display = otherHasData ? 'inline-block' : 'none';
         } catch (err) {
             alert('오류: ' + err.message);
             loadingSection.style.display = 'none';
@@ -263,10 +270,23 @@
         }
     }
 
+    // --- Back to results ---
+    backBtn.addEventListener('click', () => {
+        downloadSection.style.display = 'none';
+        if (hasType1Data && resultBodyType1.querySelectorAll('tr').length > 0) {
+            resultSectionType1.style.display = 'block';
+        }
+        if (hasType2Data && resultBodyType2.querySelectorAll('tr').length > 0) {
+            resultSectionType2.style.display = 'block';
+        }
+    });
+
     // --- Reset ---
     resetBtn.addEventListener('click', () => {
         selectedFiles = [];
         currentJobId = null;
+        hasType1Data = false;
+        hasType2Data = false;
         fileList.innerHTML = '';
         resultBodyType1.innerHTML = '';
         resultBodyType2.innerHTML = '';

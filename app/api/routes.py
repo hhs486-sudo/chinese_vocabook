@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import traceback
@@ -7,7 +8,7 @@ from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.models.schemas import ExtractResponse, GenerateRequest, WordEntry, WorkbookGenerateRequest
-from app.services.ai_extractor import extract_words, extract_workbook, detect_workbook_type
+from app.services.ai_extractor import extract_words, extract_workbook, detect_workbook_type, detect_and_extract_workbook
 from app.services.word_generator import generate_word
 from app.services.workbook_generator import generate_workbook
 
@@ -130,6 +131,8 @@ async def workbook_upload_images(
         all_entries_type1 = []
         all_entries_type2 = []
 
+        # Save all files first and validate
+        temp_paths = []
         for file in files:
             if not file.content_type or not file.content_type.startswith("image/"):
                 raise HTTPException(
@@ -144,21 +147,26 @@ async def workbook_upload_images(
                 f.write(content)
 
             logger.info(f"[Workbook] Saved: {temp_path} ({len(content)} bytes)")
+            temp_paths.append((file.filename, temp_path))
 
-            try:
-                # Auto-detect type
-                detected_type = await detect_workbook_type(temp_path)
-                logger.info(f"[Workbook] {file.filename} detected as: {detected_type}")
+        try:
+            # Process all images in parallel (single API call per image)
+            async def process_image(filename, path):
+                result = await detect_and_extract_workbook(path)
+                logger.info(f"[Workbook] {filename} -> {result['type']}, {len(result['entries'])} entries")
+                return result
 
-                # Extract based on detected type
-                entries = await extract_workbook(temp_path, detected_type)
-                logger.info(f"[Workbook] Extracted {len(entries)} entries")
+            results = await asyncio.gather(
+                *[process_image(fn, tp) for fn, tp in temp_paths]
+            )
 
-                if detected_type == "type1":
-                    all_entries_type1.extend(entries)
+            for result in results:
+                if result["type"] == "type1":
+                    all_entries_type1.extend(result["entries"])
                 else:
-                    all_entries_type2.extend(entries)
-            finally:
+                    all_entries_type2.extend(result["entries"])
+        finally:
+            for _, temp_path in temp_paths:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
 

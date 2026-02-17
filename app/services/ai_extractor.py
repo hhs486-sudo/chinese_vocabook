@@ -301,3 +301,110 @@ async def extract_workbook(file_path: str, workbook_type: str) -> list[dict]:
     if provider == "openai":
         return await _extract_workbook_openai(file_path, prompt)
     return await _extract_workbook_anthropic(file_path, prompt)
+
+
+# ===== Combined Detect + Extract (single API call) =====
+
+WORKBOOK_COMBINED_PROMPT = """이미지는 중국어 교재 페이지입니다. 유형을 판별하고 내용을 추출하세요.
+
+유형 1 (type1): 표(테이블) 형식으로 한자, 병음, 의미, 예문이 행으로 나열된 페이지
+유형 2 (type2): 대화문이 있는 유형학습 페이지 (A:, B: 등 화자별 대화)
+
+유형 1인 경우 다음 JSON으로 응답:
+{"type": "type1", "entries": [{"chinese": "한자", "pinyin": "병음(성조 포함)", "meaning": "한국어 의미", "example": "중국어 예문 원문"}, ...]}
+
+유형 1 규칙:
+- 표의 각 행이 하나의 entry. 같은 한자라도 병음/의미가 다르면 별도 entry
+- 한자 앞의 * 기호 제거
+- 예문(example)은 중국어 원문만 (한국어 해석/병음 제외)
+- 예문이 정말 없는 행만 빈 문자열 처리
+- 의미가 여러 개면 쉼표 구분
+
+유형 2인 경우 다음 JSON으로 응답:
+{"type": "type2", "entries": [{"speaker": "A", "chinese_text": "중국어 본문(한자만)", "korean": "한국어 해석"}, ...]}
+
+유형 2 규칙:
+- speaker는 원문 화자 레이블(A, B 등) 그대로
+- chinese_text는 한자 본문만 (병음 제외)
+- korean은 본문해석에서 해당 화자의 한국어 번역
+- 어휘 섹션 제외
+
+JSON 외 다른 텍스트는 절대 포함하지 마세요."""
+
+
+def _parse_combined_response(text: str) -> dict:
+    text = text.strip()
+    json_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if json_match:
+        data = json.loads(json_match.group())
+        wb_type = data.get("type", "type1")
+        if wb_type not in ("type1", "type2"):
+            wb_type = "type1"
+        return {"type": wb_type, "entries": data.get("entries", [])}
+    return {"type": "type1", "entries": []}
+
+
+async def _combined_extract_anthropic(file_path: str) -> dict:
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    image_data = _encode_image(file_path)
+    media_type = _get_media_type(file_path)
+
+    message = await client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=4096,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": image_data,
+                        },
+                    },
+                    {"type": "text", "text": WORKBOOK_COMBINED_PROMPT},
+                ],
+            }
+        ],
+    )
+    return _parse_combined_response(message.content[0].text)
+
+
+async def _combined_extract_openai(file_path: str) -> dict:
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    image_data = _encode_image(file_path)
+    media_type = _get_media_type(file_path)
+
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        max_tokens=4096,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{media_type};base64,{image_data}"
+                        },
+                    },
+                    {"type": "text", "text": WORKBOOK_COMBINED_PROMPT},
+                ],
+            }
+        ],
+    )
+    return _parse_combined_response(response.choices[0].message.content)
+
+
+async def detect_and_extract_workbook(file_path: str) -> dict:
+    """Detect type and extract workbook content in a single API call."""
+    provider = os.getenv("AI_PROVIDER", "anthropic").lower()
+    if provider == "openai":
+        return await _combined_extract_openai(file_path)
+    return await _combined_extract_anthropic(file_path)
