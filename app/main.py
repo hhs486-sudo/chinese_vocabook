@@ -27,6 +27,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+@app.head("/")
+async def index_head():
+    return JSONResponse(content={})
+
+
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
