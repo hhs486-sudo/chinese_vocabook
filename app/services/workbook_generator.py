@@ -213,7 +213,45 @@ def generate_workbook_type2(entries: list[dict], job_id: str | None = None) -> s
     return output_path
 
 
+def generate_workbook_type3(entries: list[dict], job_id: str | None = None) -> str:
+    """Generate Type 3 workbook: phrase explanation examples only.
+
+    Each entry: Korean line + gray Chinese line for tracing (same as Type 2).
+    """
+    doc = Document()
+
+    section = doc.sections[0]
+    section.top_margin = Cm(1.5)
+    section.bottom_margin = Cm(1.5)
+    section.left_margin = Cm(2.0)
+    section.right_margin = Cm(2.0)
+
+    for entry in entries:
+        chinese_text = entry.get("chinese_text", "")
+        korean = entry.get("korean", "")
+
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        run = p.add_run(korean)
+        _set_run_font(run, "맑은 고딕", 11)
+
+        p = doc.add_paragraph()
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.space_after = Pt(0)
+        run = p.add_run(chinese_text)
+        _set_run_font(run, "Microsoft YaHei", 16, color=GRAY_COLOR)
+
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    file_id = job_id or str(uuid.uuid4())
+    output_path = os.path.join(TEMP_DIR, f"{file_id}.docx")
+    doc.save(output_path)
+    return output_path
+
+
 def generate_workbook(entries: list[dict], workbook_type: str, job_id: str | None = None) -> str:
     if workbook_type == "type1":
         return generate_workbook_type1(entries, job_id)
+    if workbook_type == "type3":
+        return generate_workbook_type3(entries, job_id)
     return generate_workbook_type2(entries, job_id)

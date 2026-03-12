@@ -8,6 +8,7 @@
     const loadingSection = document.getElementById('wb-loading-section');
     const resultSectionType1 = document.getElementById('wb-result-section-type1');
     const resultSectionType2 = document.getElementById('wb-result-section-type2');
+    const resultSectionType3 = document.getElementById('wb-result-section-type3');
     const downloadSection = document.getElementById('wb-download-section');
     const downloadLink = document.getElementById('wb-download-link');
     const backBtn = document.getElementById('wb-back-btn');
@@ -17,6 +18,7 @@
     let currentJobId = null;
     let hasType1Data = false;
     let hasType2Data = false;
+    let hasType3Data = false;
 
     // --- Upload ---
     dropZone.addEventListener('click', () => fileInput.click());
@@ -88,6 +90,7 @@
             // Show results based on what was detected
             hasType1Data = data.type1_entries && data.type1_entries.length > 0;
             hasType2Data = data.type2_entries && data.type2_entries.length > 0;
+            hasType3Data = data.type3_entries && data.type3_entries.length > 0;
 
             if (hasType1Data) {
                 renderType1Result(data.type1_entries);
@@ -97,7 +100,11 @@
                 renderType2Result(data.type2_entries);
                 resultSectionType2.style.display = 'block';
             }
-            if (!hasType1Data && !hasType2Data) {
+            if (hasType3Data) {
+                renderType3Result(data.type3_entries);
+                resultSectionType3.style.display = 'block';
+            }
+            if (!hasType1Data && !hasType2Data && !hasType3Data) {
                 alert('이미지에서 워크북 데이터를 추출하지 못했습니다.');
                 uploadSection.style.display = 'block';
             }
@@ -220,6 +227,59 @@
         generateWorkbook('type2', entries);
     });
 
+    // ===== Type 3: 어구풀이 =====
+    const resultBodyType3 = document.getElementById('wb-result-body-type3');
+    const entryCountType3 = document.getElementById('wb-entry-count-type3');
+    const addRowBtnType3 = document.getElementById('wb-add-row-btn-type3');
+    const generateBtnType3 = document.getElementById('wb-generate-btn-type3');
+
+    function renderType3Result(entries) {
+        resultBodyType3.innerHTML = '';
+        entries.forEach((e, i) => addType3Row(e, i + 1));
+        updateType3Count();
+    }
+
+    function addType3Row(entry, num) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${num}</td>
+            <td><input type="text" class="korean" value="${escapeHtml(entry.korean || '')}"></td>
+            <td><input type="text" class="chinese_text" value="${escapeHtml(entry.chinese_text || '')}"></td>
+            <td><button class="delete-btn" title="삭제">&times;</button></td>
+        `;
+        tr.querySelector('.delete-btn').addEventListener('click', () => {
+            tr.remove();
+            renumberRows(resultBodyType3);
+            updateType3Count();
+        });
+        resultBodyType3.appendChild(tr);
+    }
+
+    function updateType3Count() {
+        entryCountType3.textContent = `(${resultBodyType3.querySelectorAll('tr').length}개)`;
+    }
+
+    addRowBtnType3.addEventListener('click', () => {
+        const num = resultBodyType3.querySelectorAll('tr').length + 1;
+        addType3Row({ korean: '', chinese_text: '' }, num);
+        updateType3Count();
+        const lastRow = resultBodyType3.lastElementChild;
+        if (lastRow) lastRow.querySelector('input').focus();
+    });
+
+    generateBtnType3.addEventListener('click', () => {
+        const rows = resultBodyType3.querySelectorAll('tr');
+        const entries = [];
+        rows.forEach(tr => {
+            const korean = tr.querySelector('.korean').value.trim();
+            const chinese_text = tr.querySelector('.chinese_text').value.trim();
+            if (korean || chinese_text) {
+                entries.push({ korean, chinese_text });
+            }
+        });
+        generateWorkbook('type3', entries);
+    });
+
     // ===== Common =====
     function renumberRows(tbody) {
         tbody.querySelectorAll('tr').forEach((tr, i) => {
@@ -258,7 +318,7 @@
             downloadSection.style.display = 'block';
 
             // Show back button if there are other result sections with data
-            const otherHasData = (wbType === 'type1' && hasType2Data) || (wbType === 'type2' && hasType1Data);
+            const otherHasData = (wbType !== 'type1' && hasType1Data) || (wbType !== 'type2' && hasType2Data) || (wbType !== 'type3' && hasType3Data);
             backBtn.style.display = otherHasData ? 'inline-block' : 'none';
         } catch (err) {
             alert('오류: ' + err.message);
@@ -267,6 +327,7 @@
             // Show back whichever result sections had data
             if (resultBodyType1.querySelectorAll('tr').length > 0) resultSectionType1.style.display = 'block';
             if (resultBodyType2.querySelectorAll('tr').length > 0) resultSectionType2.style.display = 'block';
+            if (resultBodyType3.querySelectorAll('tr').length > 0) resultSectionType3.style.display = 'block';
         }
     }
 
@@ -279,6 +340,9 @@
         if (hasType2Data && resultBodyType2.querySelectorAll('tr').length > 0) {
             resultSectionType2.style.display = 'block';
         }
+        if (hasType3Data && resultBodyType3.querySelectorAll('tr').length > 0) {
+            resultSectionType3.style.display = 'block';
+        }
     });
 
     // --- Reset ---
@@ -287,13 +351,16 @@
         currentJobId = null;
         hasType1Data = false;
         hasType2Data = false;
+        hasType3Data = false;
         fileList.innerHTML = '';
         resultBodyType1.innerHTML = '';
         resultBodyType2.innerHTML = '';
+        resultBodyType3.innerHTML = '';
         extractBtn.disabled = true;
         downloadSection.style.display = 'none';
         resultSectionType1.style.display = 'none';
         resultSectionType2.style.display = 'none';
+        resultSectionType3.style.display = 'none';
         loadingSection.style.display = 'none';
         loadingSection.querySelector('p').textContent = 'AI가 교재를 분석 중입니다...';
         uploadSection.style.display = 'block';
