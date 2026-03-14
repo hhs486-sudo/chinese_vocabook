@@ -215,6 +215,7 @@ async def workbook_upload_images(
         all_entries_type1 = []
         all_entries_type2 = []
         all_entries_type3 = []
+        all_entries_type4 = []
 
         # Save all files first and validate
         temp_paths = []
@@ -250,6 +251,8 @@ async def workbook_upload_images(
                     all_entries_type1.extend(result["entries"])
                 elif result["type"] == "type3":
                     all_entries_type3.extend(result["entries"])
+                elif result["type"] == "type4":
+                    all_entries_type4.extend(result["entries"])
                 else:
                     all_entries_type2.extend(result["entries"])
         finally:
@@ -262,6 +265,7 @@ async def workbook_upload_images(
             "type1_entries": all_entries_type1,
             "type2_entries": all_entries_type2,
             "type3_entries": all_entries_type3,
+            "type4_entries": all_entries_type4,
         }
 
     except HTTPException:

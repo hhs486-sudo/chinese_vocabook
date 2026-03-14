@@ -9,6 +9,7 @@
     const resultSectionType1 = document.getElementById('wb-result-section-type1');
     const resultSectionType2 = document.getElementById('wb-result-section-type2');
     const resultSectionType3 = document.getElementById('wb-result-section-type3');
+    const resultSectionType4 = document.getElementById('wb-result-section-type4');
     const downloadSection = document.getElementById('wb-download-section');
     const downloadLink = document.getElementById('wb-download-link');
     const backBtn = document.getElementById('wb-back-btn');
@@ -19,6 +20,7 @@
     let hasType1Data = false;
     let hasType2Data = false;
     let hasType3Data = false;
+    let hasType4Data = false;
 
     // --- Upload ---
     dropZone.addEventListener('click', () => fileInput.click());
@@ -91,6 +93,7 @@
             hasType1Data = data.type1_entries && data.type1_entries.length > 0;
             hasType2Data = data.type2_entries && data.type2_entries.length > 0;
             hasType3Data = data.type3_entries && data.type3_entries.length > 0;
+            hasType4Data = data.type4_entries && data.type4_entries.length > 0;
 
             if (hasType1Data) {
                 renderType1Result(data.type1_entries);
@@ -104,7 +107,11 @@
                 renderType3Result(data.type3_entries);
                 resultSectionType3.style.display = 'block';
             }
-            if (!hasType1Data && !hasType2Data && !hasType3Data) {
+            if (hasType4Data) {
+                renderType4Result(data.type4_entries);
+                resultSectionType4.style.display = 'block';
+            }
+            if (!hasType1Data && !hasType2Data && !hasType3Data && !hasType4Data) {
                 alert('이미지에서 워크북 데이터를 추출하지 못했습니다.');
                 uploadSection.style.display = 'block';
             }
@@ -280,6 +287,59 @@
         generateWorkbook('type3', entries);
     });
 
+    // ===== Type 4: 교과서 본문 =====
+    const resultBodyType4 = document.getElementById('wb-result-body-type4');
+    const entryCountType4 = document.getElementById('wb-entry-count-type4');
+    const addRowBtnType4 = document.getElementById('wb-add-row-btn-type4');
+    const generateBtnType4 = document.getElementById('wb-generate-btn-type4');
+
+    function renderType4Result(entries) {
+        resultBodyType4.innerHTML = '';
+        entries.forEach((e, i) => addType4Row(e, i + 1));
+        updateType4Count();
+    }
+
+    function addType4Row(entry, num) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${num}</td>
+            <td><input type="text" class="korean" value="${escapeHtml(entry.korean || '')}"></td>
+            <td><input type="text" class="chinese_text" value="${escapeHtml(entry.chinese_text || '')}"></td>
+            <td><button class="delete-btn" title="삭제">&times;</button></td>
+        `;
+        tr.querySelector('.delete-btn').addEventListener('click', () => {
+            tr.remove();
+            renumberRows(resultBodyType4);
+            updateType4Count();
+        });
+        resultBodyType4.appendChild(tr);
+    }
+
+    function updateType4Count() {
+        entryCountType4.textContent = `(${resultBodyType4.querySelectorAll('tr').length}개)`;
+    }
+
+    addRowBtnType4.addEventListener('click', () => {
+        const num = resultBodyType4.querySelectorAll('tr').length + 1;
+        addType4Row({ korean: '', chinese_text: '' }, num);
+        updateType4Count();
+        const lastRow = resultBodyType4.lastElementChild;
+        if (lastRow) lastRow.querySelector('input').focus();
+    });
+
+    generateBtnType4.addEventListener('click', () => {
+        const rows = resultBodyType4.querySelectorAll('tr');
+        const entries = [];
+        rows.forEach(tr => {
+            const korean = tr.querySelector('.korean').value.trim();
+            const chinese_text = tr.querySelector('.chinese_text').value.trim();
+            if (korean || chinese_text) {
+                entries.push({ korean, chinese_text });
+            }
+        });
+        generateWorkbook('type4', entries);
+    });
+
     // ===== Common =====
     function renumberRows(tbody) {
         tbody.querySelectorAll('tr').forEach((tr, i) => {
@@ -295,6 +355,8 @@
 
         resultSectionType1.style.display = 'none';
         resultSectionType2.style.display = 'none';
+        resultSectionType3.style.display = 'none';
+        resultSectionType4.style.display = 'none';
         loadingSection.style.display = 'block';
         loadingSection.querySelector('p').textContent = '워크북을 생성 중입니다...';
 
@@ -318,7 +380,7 @@
             downloadSection.style.display = 'block';
 
             // Show back button if there are other result sections with data
-            const otherHasData = (wbType !== 'type1' && hasType1Data) || (wbType !== 'type2' && hasType2Data) || (wbType !== 'type3' && hasType3Data);
+            const otherHasData = (wbType !== 'type1' && hasType1Data) || (wbType !== 'type2' && hasType2Data) || (wbType !== 'type3' && hasType3Data) || (wbType !== 'type4' && hasType4Data);
             backBtn.style.display = otherHasData ? 'inline-block' : 'none';
         } catch (err) {
             alert('오류: ' + err.message);
@@ -328,6 +390,7 @@
             if (resultBodyType1.querySelectorAll('tr').length > 0) resultSectionType1.style.display = 'block';
             if (resultBodyType2.querySelectorAll('tr').length > 0) resultSectionType2.style.display = 'block';
             if (resultBodyType3.querySelectorAll('tr').length > 0) resultSectionType3.style.display = 'block';
+            if (resultBodyType4.querySelectorAll('tr').length > 0) resultSectionType4.style.display = 'block';
         }
     }
 
@@ -343,6 +406,9 @@
         if (hasType3Data && resultBodyType3.querySelectorAll('tr').length > 0) {
             resultSectionType3.style.display = 'block';
         }
+        if (hasType4Data && resultBodyType4.querySelectorAll('tr').length > 0) {
+            resultSectionType4.style.display = 'block';
+        }
     });
 
     // --- Reset ---
@@ -352,15 +418,18 @@
         hasType1Data = false;
         hasType2Data = false;
         hasType3Data = false;
+        hasType4Data = false;
         fileList.innerHTML = '';
         resultBodyType1.innerHTML = '';
         resultBodyType2.innerHTML = '';
         resultBodyType3.innerHTML = '';
+        resultBodyType4.innerHTML = '';
         extractBtn.disabled = true;
         downloadSection.style.display = 'none';
         resultSectionType1.style.display = 'none';
         resultSectionType2.style.display = 'none';
         resultSectionType3.style.display = 'none';
+        resultSectionType4.style.display = 'none';
         loadingSection.style.display = 'none';
         loadingSection.querySelector('p').textContent = 'AI가 교재를 분석 중입니다...';
         uploadSection.style.display = 'block';

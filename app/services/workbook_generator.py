@@ -254,4 +254,6 @@ def generate_workbook(entries: list[dict], workbook_type: str, job_id: str | Non
         return generate_workbook_type1(entries, job_id)
     if workbook_type == "type3":
         return generate_workbook_type3(entries, job_id)
+    if workbook_type == "type4":
+        return generate_workbook_type3(entries, job_id)
     return generate_workbook_type2(entries, job_id)

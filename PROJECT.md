@@ -88,7 +88,7 @@ EBS 중국어 교재 사진에서 AI로 텍스트를 추출하여 MS Word 기반
   }
   ```
 - Response: `{"download_id": "file-uuid"}`
-
+11
 **GET `/api/download/{download_id}`**
 - Response: `중국어단어장.docx` 파일
 
