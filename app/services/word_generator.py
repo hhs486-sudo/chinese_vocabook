@@ -4,9 +4,12 @@ import uuid
 
 from docx import Document
 from docx.oxml.ns import qn
-from docx.shared import Pt
+from docx.shared import Pt, RGBColor
+
+GRAY_COLOR = RGBColor(0xEA, 0xEA, 0xEA)
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "중국어단어장.docx")
+HANJA_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "한자단어장.docx")
 TEMP_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "temp")
 
 MIN_FONT_SIZE = 7
@@ -160,3 +163,97 @@ def _fill_table(table, words: list[dict], usable_width: float):
         korean_text = word.get("korean", "")
         korean_size = _calc_font_size(korean_text, usable_width, 11)
         _set_cell_text(cells[5], korean_text, "맑은 고딕", korean_size)
+
+
+def _set_cell_hanja_hun_eum(cell, hun: str, eum: str, font_name: str, font_size: int):
+    """Set cell text as 'hun / eum' with eum in bold."""
+    para = cell.paragraphs[0]
+    para.clear()
+
+    run1 = para.add_run(f"{hun} / ")
+    run1.font.size = Pt(font_size)
+    rPr1 = run1._r.get_or_add_rPr()
+    rFonts1 = rPr1.find(qn("w:rFonts"))
+    if rFonts1 is None:
+        rFonts1 = run1._r.makeelement(qn("w:rFonts"), {})
+        rPr1.insert(0, rFonts1)
+    rFonts1.set(qn("w:ascii"), font_name)
+    rFonts1.set(qn("w:hAnsi"), font_name)
+    rFonts1.set(qn("w:eastAsia"), font_name)
+
+    run2 = para.add_run(eum)
+    run2.bold = True
+    run2.font.size = Pt(font_size)
+    rPr2 = run2._r.get_or_add_rPr()
+    rFonts2 = rPr2.find(qn("w:rFonts"))
+    if rFonts2 is None:
+        rFonts2 = run2._r.makeelement(qn("w:rFonts"), {})
+        rPr2.insert(0, rFonts2)
+    rFonts2.set(qn("w:ascii"), font_name)
+    rFonts2.set(qn("w:hAnsi"), font_name)
+    rFonts2.set(qn("w:eastAsia"), font_name)
+
+
+def _set_cell_gray_text(cell, text: str, font_name: str, font_size: int):
+    """Set cell text with gray color."""
+    para = cell.paragraphs[0]
+    para.clear()
+    run = para.add_run(text)
+    run.font.size = Pt(font_size)
+    run.font.color.rgb = GRAY_COLOR
+    rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = run._r.makeelement(qn("w:rFonts"), {})
+        rPr.insert(0, rFonts)
+    rFonts.set(qn("w:ascii"), font_name)
+    rFonts.set(qn("w:hAnsi"), font_name)
+    rFonts.set(qn("w:eastAsia"), font_name)
+
+
+def generate_hanja_word(words: list[dict], job_id: str | None = None) -> str:
+    """Generate a Word file from extracted hanja words using the template.
+
+    cells[0] = hanja (black), cells[1] = hanja (gray, for tracing), cells[2] = hun / eum (eum bold)
+    """
+    doc = Document(os.path.abspath(HANJA_TEMPLATE_PATH))
+
+    settings = doc.settings.element
+    doc_prot = settings.find(qn("w:documentProtection"))
+    if doc_prot is not None:
+        settings.remove(doc_prot)
+
+    body = doc.element.body
+    table = doc.tables[0]
+    rows_per_page = len(table.rows)
+    template_tbl_xml = copy.deepcopy(table._tbl)
+
+    pages = []
+    for i in range(0, len(words), rows_per_page):
+        pages.append(words[i : i + rows_per_page])
+    if not pages:
+        pages = [[]]
+
+    _fill_hanja_table(doc.tables[0], pages[0])
+    for page_idx in range(1, len(pages)):
+        new_tbl = copy.deepcopy(template_tbl_xml)
+        body.append(new_tbl)
+        _fill_hanja_table(doc.tables[page_idx], pages[page_idx])
+
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    file_id = job_id or str(uuid.uuid4())
+    output_path = os.path.join(TEMP_DIR, f"{file_id}_hanja.docx")
+    doc.save(output_path)
+    return output_path
+
+
+def _fill_hanja_table(table, words: list[dict]):
+    """Fill a table's rows with hanja word data."""
+    for i, word in enumerate(words):
+        if i >= len(table.rows):
+            break
+        cells = table.rows[i].cells
+        hanja = word.get("hanja", "")
+        _set_cell_text(cells[0], hanja, "Microsoft YaHei", 15)
+        _set_cell_gray_text(cells[1], hanja, "Microsoft YaHei", 15)
+        _set_cell_hanja_hun_eum(cells[2], word.get("hun", ""), word.get("eum", ""), "맑은 고딕", 13)

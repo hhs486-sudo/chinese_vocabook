@@ -14,6 +14,7 @@
         <div class="tab-nav">
             <button class="tab-btn active" data-tab="vocab">단어장</button>
             <button class="tab-btn" data-tab="workbook">워크북</button>
+            <button class="tab-btn" data-tab="hanja">한자</button>
         </div>
 
         <!-- ===== 단어장 탭 ===== -->
@@ -67,6 +68,56 @@
                 <p>단어장이 생성되었습니다!</p>
                 <a id="vocab-download-link" class="btn btn-primary" href="#">📥 다운로드</a>
                 <button id="vocab-reset-btn" class="btn btn-secondary">새로 만들기</button>
+            </div>
+        </div>
+
+        <!-- ===== 한자 탭 ===== -->
+        <div id="tab-hanja" class="tab-content">
+            <p class="subtitle">한문 교재 사진을 업로드하면 AI가 한자·훈·음을 추출하여 Word 단어장을 만들어줍니다</p>
+
+            <div id="hanja-upload-section" class="section">
+                <div class="upload-area" id="hanja-drop-zone">
+                    <div class="upload-icon">📷</div>
+                    <p>이미지를 드래그하거나 클릭하여 업로드</p>
+                    <p class="hint">JPG, PNG, WebP 지원 · 여러 장 가능</p>
+                    <input type="file" id="hanja-file-input" multiple accept="image/*" hidden>
+                </div>
+                <div id="hanja-file-list" class="file-list"></div>
+                <button id="hanja-extract-btn" class="btn btn-primary" disabled>AI 추출 시작</button>
+            </div>
+
+            <div id="hanja-loading-section" class="section" style="display:none;">
+                <div class="spinner"></div>
+                <p>AI가 이미지를 분석 중입니다...</p>
+            </div>
+
+            <div id="hanja-result-section" class="section" style="display:none;">
+                <h2>추출 결과 <span id="hanja-word-count"></span></h2>
+                <div class="table-wrapper">
+                    <table id="hanja-result-table" class="result-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>한자</th>
+                                <th>훈</th>
+                                <th>음</th>
+                                <th>삭제</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hanja-result-body"></tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button id="hanja-add-row-btn" class="btn btn-secondary">+ 행 추가</button>
+                    <button id="hanja-generate-btn" class="btn btn-primary">Word 파일 생성</button>
+                </div>
+            </div>
+
+            <div id="hanja-download-section" class="section" style="display:none;">
+                <div class="success-icon">✅</div>
+                <p>한자 단어장이 생성되었습니다!</p>
+                <a id="hanja-download-link" class="btn btn-primary" href="#">📥 다운로드</a>
+                <button id="hanja-reset-btn" class="btn btn-secondary">새로 만들기</button>
             </div>
         </div>
 
@@ -172,6 +223,7 @@
         </div>
     </div>
     <script src="/static/js/main.js"></script>
+    <script src="/static/js/hanja.js"></script>
     <script src="/static/js/workbook.js"></script>
 </body>
 </html>

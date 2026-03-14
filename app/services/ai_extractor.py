@@ -98,6 +98,106 @@ async def extract_words_openai(file_path: str) -> list[dict]:
     return _parse_response(response.choices[0].message.content)
 
 
+EXTRACT_HANJA_PROMPT = """이미지는 한문(한자) 교재 페이지입니다. 이미지에 있는 한자를 모두 추출하여 다음 JSON 형식으로만 응답하세요:
+{"words": [{"hanja": "한자", "hun": "훈(뜻)", "eum": "음(소리)"}, ...]}
+
+규칙:
+1. 페이지에서 한자와 훈·음이 표시된 모든 글자를 추출하세요
+2. 기본 형식: "한자훈음" (예: 山산산 → hanja: "山", hun: "산", eum: "산")
+3. hanja: 한자 1글자
+4. hun: 한자의 훈(뜻) — 한글
+5. eum: 한자의 음(소리) — 한글
+6. 복수 독음은 슬래시로 구분 (예: 金쇠금/성씨김 → hun: "쇠/성씨", eum: "금/김")
+7. 한자가 없는 한글 텍스트(단원 제목, 설명문, 만화 대사 등)는 제외
+8. JSON 외 다른 텍스트는 절대 포함하지 마세요"""
+
+
+async def extract_hanja_anthropic(file_path: str) -> list[dict]:
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    image_data = _encode_image(file_path)
+    media_type = _get_media_type(file_path)
+
+    message = await client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=4096,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": image_data,
+                        },
+                    },
+                    {"type": "text", "text": EXTRACT_HANJA_PROMPT},
+                ],
+            }
+        ],
+    )
+    return _parse_hanja_response(message.content[0].text)
+
+
+async def extract_hanja_openai(file_path: str) -> list[dict]:
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    image_data = _encode_image(file_path)
+    media_type = _get_media_type(file_path)
+
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        max_tokens=4096,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{media_type};base64,{image_data}"
+                        },
+                    },
+                    {"type": "text", "text": EXTRACT_HANJA_PROMPT},
+                ],
+            }
+        ],
+    )
+    return _parse_hanja_response(response.choices[0].message.content)
+
+
+def _parse_hanja_response(text: str) -> list[dict]:
+    text = text.strip()
+    # Find the outermost JSON object by tracking brace depth
+    start = text.find("{")
+    if start == -1:
+        return []
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    data = json.loads(text[start:i + 1])
+                    return data.get("words", [])
+                except json.JSONDecodeError:
+                    return []
+    return []
+
+
+async def extract_hanja(file_path: str) -> list[dict]:
+    provider = os.getenv("AI_PROVIDER", "anthropic").lower()
+    if provider == "openai":
+        return await extract_hanja_openai(file_path)
+    return await extract_hanja_anthropic(file_path)
+
+
 def _parse_response(text: str) -> list[dict]:
     text = text.strip()
     json_match = re.search(r"\{.*\}", text, re.DOTALL)

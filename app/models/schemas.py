@@ -41,3 +41,16 @@ class WorkbookGenerateRequest(BaseModel):
     job_id: str
     workbook_type: str
     entries: list[dict]
+
+
+# ===== Hanja Models =====
+
+class HanjaEntry(BaseModel):
+    hanja: str
+    hun: str
+    eum: str
+
+
+class HanjaGenerateRequest(BaseModel):
+    job_id: str
+    words: list[HanjaEntry]

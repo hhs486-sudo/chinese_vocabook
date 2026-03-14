@@ -7,9 +7,9 @@ import uuid
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
-from app.models.schemas import ExtractResponse, GenerateRequest, WordEntry, WorkbookGenerateRequest
-from app.services.ai_extractor import extract_words, extract_workbook, detect_workbook_type, detect_and_extract_workbook
-from app.services.word_generator import generate_word
+from app.models.schemas import ExtractResponse, GenerateRequest, WordEntry, WorkbookGenerateRequest, HanjaGenerateRequest
+from app.services.ai_extractor import extract_words, extract_workbook, detect_workbook_type, detect_and_extract_workbook, extract_hanja
+from app.services.word_generator import generate_word, generate_hanja_word
 from app.services.workbook_generator import generate_workbook
 
 logger = logging.getLogger("uvicorn.error")
@@ -110,6 +110,90 @@ async def download_file(download_id: str):
     return FileResponse(
         path=file_path,
         filename="중국어단어장.docx",
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
+# ===== 한자 단어장 API =====
+
+@router.post("/hanja/upload")
+async def hanja_upload_images(files: list[UploadFile] = File(...)):
+    """Upload hanja textbook images and extract hanja/hun/eum."""
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="파일을 선택해주세요.")
+
+        job_id = str(uuid.uuid4())
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+        all_words = []
+        seen = set()
+
+        for file in files:
+            if not file.content_type or not file.content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"이미지 파일만 업로드 가능합니다: {file.filename}",
+                )
+            ext = os.path.splitext(file.filename or "img.jpg")[1]
+            temp_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}{ext}")
+            content = await file.read()
+            with open(temp_path, "wb") as f:
+                f.write(content)
+            logger.info(f"[Hanja] Saved: {temp_path} ({len(content)} bytes)")
+
+            try:
+                words = await extract_hanja(temp_path)
+                logger.info(f"[Hanja] Extracted {len(words)} entries")
+                for w in words:
+                    key = (w.get("hanja", ""), w.get("eum", ""))
+                    if key not in seen:
+                        seen.add(key)
+                        all_words.append(w)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+        return {
+            "job_id": job_id,
+            "words": [{"hanja": w.get("hanja",""), "hun": w.get("hun",""), "eum": w.get("eum","")} for w in all_words],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Hanja upload error: {traceback.format_exc()}")
+        return JSONResponse(status_code=500, content={"detail": f"서버 오류: {type(e).__name__}: {str(e)}"})
+
+
+@router.post("/hanja/generate")
+async def hanja_generate_docx(request: HanjaGenerateRequest):
+    """Generate a hanja Word file."""
+    try:
+        words = [w.model_dump() for w in request.words]
+        if not words:
+            raise HTTPException(status_code=400, detail="단어 목록이 비어있습니다.")
+
+        output_path = generate_hanja_word(words, request.job_id)
+        file_id = os.path.splitext(os.path.basename(output_path))[0]
+        return {"download_id": file_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Hanja generate error: {traceback.format_exc()}")
+        return JSONResponse(status_code=500, content={"detail": f"서버 오류: {type(e).__name__}: {str(e)}"})
+
+
+@router.get("/hanja/download/{download_id}")
+async def hanja_download_file(download_id: str):
+    """Download the generated hanja Word file."""
+    file_path = os.path.join(UPLOAD_DIR, f"{download_id}.docx")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return FileResponse(
+        path=file_path,
+        filename="한자단어장.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
 
